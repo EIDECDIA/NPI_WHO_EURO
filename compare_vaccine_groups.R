@@ -16,9 +16,119 @@ lab <- readRDS("data/joined_all_V8.RDS")$policy_dic %>%
   mutate(lab = factor(lab, levels = lab))
 
 
-# Combinations of scenarios:
+#~#~# All countries continuous  effort, facet by PHSM #~#~# 
+
+effort_val <- c("con_s0_full", "con_s1_A","con_s1_D")
+
+# Function plot all countries together
+plot_PHSM_x_VAC <- function(i){
+
+test_data <- joined[[i]] %>% 
+  mutate(period = i) %>% 
+  mutate(period = case_when(grepl("s0_full", period) ~ "Full_TS", 
+                                grepl("s1_A", period) ~ "Alpha",
+                                grepl("s1_D", period) ~ "Delta")) %>% 
+  replace_na(list(V_all_adj = 0)) %>% 
+  select(cnt, npi_val, V_all_adj, period) %>% 
+  pivot_longer(cols = npi_val, names_to = "NPI") %>% 
+  left_join(lab, by = c("NPI" = "policy_code")) 
+
+test_data %>% 
+  ggplot(aes(x= V_all_adj, y= value))+
+  geom_jitter(size = 0.1, alpha = 0.1)+
+  geom_smooth(method = "lm", linetype = "dashed") +
+  facet_wrap(~lab, nrow = 2, ncol = 7, labeller = label_wrap_gen(multi_line = T, width = 12))+
+  labs(y = "PHSM implementation strength", 
+       x = "Vaccine uptake proportion",
+       title = test_data %>% 
+         pull(period) %>% 
+         first())+
+  theme_bw()+
+  theme(panel.grid = element_blank(),
+        legend.position = "bottom",
+        legend.title = element_text(size = 12),
+        strip.background = element_rect(fill = NA),
+        axis.text.x = element_text(vjust = 0.5,
+                                   angle = 90,
+                                   hjust = 1),
+        axis.text = element_text(size = 8),
+        axis.title = element_text(size = 15),
+        legend.text = element_text(size = 8),
+        strip.text = element_text(size = 8))
+
+ggsave(filename = paste0("figs/PHSM_x_VAC/all_cnt/",  test_data %>% 
+                           pull(period) %>% 
+                           first(), "_cont.png"),
+       plot = last_plot(),
+       width = 12,
+       height = 6)
+
+}
+
+# Map function
+map(effort_val, plot_PHSM_x_VAC)
+
+
+
+#~#~# All countries continuous effort by individual PHSM and facet by country #~#~# 
+# PHSM code
+npi_val <- c("C1","C2","C3","C4","C5","C6","C7","C8","E1","E2","H1","H2","H3","H6") 
+
+# By PHSM and country
+plot_PHSM_x_VAC_cnt <- function(i){
+  
+  test_data <- joined[["con_s0_full"]] %>% 
+    replace_na(list(V_all_adj = 0)) %>% 
+    select(country, cnt, npi_val, V_all_adj) %>% 
+    pivot_longer(cols = npi_val, names_to = "NPI") %>% 
+    left_join(lab, by = c("NPI" = "policy_code")) %>% 
+    filter(NPI == i)
+  
+  test_data %>% 
+    ggplot(aes(x= V_all_adj, y= value))+
+    geom_jitter(size = 0.1, alpha = 0.1)+
+    geom_smooth(method = "lm", linetype = "dashed", size = 0.5) +
+    facet_wrap(~country, nrow = 7, ncol = 7)+
+    labs(y = "PHSM implementation strength", 
+         x = "Vaccine uptake proportion",
+         title = paste0(test_data %>% 
+                          pull(NPI) %>% 
+                          first(), " - ", test_data %>% 
+                          pull(lab) %>% 
+                          first()))+
+    theme_bw()+
+    theme(panel.grid = element_blank(),
+          legend.position = "bottom",
+          legend.title = element_text(size = 12),
+          strip.background = element_rect(fill = NA),
+          axis.text.x = element_text(vjust = 0.5,
+                                     angle = 90,
+                                     hjust = 1),
+          axis.text = element_text(size = 6),
+          axis.title = element_text(size = 10),
+          legend.text = element_text(size = 8),
+          strip.text = element_text(size = 5))
+  
+  ggsave(filename = paste0("figs/PHSM_x_VAC/all_PHSM/", test_data %>% 
+                             pull(NPI) %>% 
+                             first(), "_cont.png"),
+         plot = last_plot(),
+         width = 8,
+         height = 8)
+  
+}
+
+# Map function
+map(npi_val, plot_PHSM_x_VAC_cnt)
+
+
+
+#~#~# Binary PHSM scenarios #~#~# 
+
+# Any effort and max effort scenarios :
+# Combinations of scenarios
 effort_val <- c("max_s0_full", "any_s0_full")
-npi_val <- c("C1","C2","C3","C4","C5","C6","C7","C8","E1","E2","H1","H2","H3","H6") # ,"C2","C3","C4","C5","C6","C7","C8","E1","E2","H1","H2","H3","H6"
+npi_val <- c("C1","C2","C3","C4","C5","C6","C7","C8","E1","E2","H1","H2","H3","H6") 
 npi_on <- c("1", "0")
 
 # All combination of parameters
@@ -104,7 +214,7 @@ full_result_labs %>%
         legend.text = element_text(size = 8),
         strip.text = element_text(size = 8))
 
-ggsave(filename = "figs/main_text/vaccine_x_PHSM.png",
+ggsave(filename = "figs/PHSM_x_VAC/Binary_PHSM/binary.png",
               plot = last_plot(),
               width = 12,
               height = 6)
