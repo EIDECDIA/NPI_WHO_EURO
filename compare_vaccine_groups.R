@@ -12,7 +12,8 @@ lab <- readRDS("data/joined_all_V8.RDS")$policy_dic %>%
                            paste0("E", 1:4) ~ "Economic Response  ",
                          policy_code %in%
                            paste0("H", 1:6) ~ "Public Health & Health System Response  "),
-         lab = gsub("\\.", " ", policy_name))
+         lab = gsub("\\.", " ", policy_name)) %>% 
+  mutate(lab = factor(lab, levels = lab))
 
 
 # Combinations of scenarios:
