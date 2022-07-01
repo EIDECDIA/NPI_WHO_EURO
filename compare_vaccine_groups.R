@@ -1,5 +1,5 @@
 
-# Script to investigate if PHSM presence is associated with vaccine uptake
+# Script to investigate if PHSM strength is associated  with vaccine uptake rates
 
 #Load in data
 joined <- read_rds("data/joined_v9.rds")
@@ -16,8 +16,94 @@ lab <- readRDS("data/joined_all_V8.RDS")$policy_dic %>%
   mutate(lab = factor(lab, levels = lab))
 
 
-#~#~# All countries continuous  effort, facet by PHSM #~#~# 
+#~#~# All countries continuous effort, facet by PHSM #~#~#
 
+# ANOVA analysis by VoC period
+
+ANOVA_plot <- function(PERIOD){
+
+# Prepare data
+test_data <- joined[[PERIOD]] %>% 
+  mutate(period = PERIOD) %>% 
+  mutate(period = case_when(grepl("s0_full", period) ~ "Full_TS", 
+                            grepl("s1_A", period) ~ "Alpha",
+                            grepl("s1_D", period) ~ "Delta")) %>% 
+  replace_na(list(V_all_adj = 0)) %>% 
+  select(cnt, npi_val, V_all_adj, period) %>% 
+  pivot_longer(cols = npi_val, names_to = "NPI") %>% 
+  left_join(lab, by = c("NPI" = "policy_code")) %>% 
+  mutate(value = round(value, digits = 2)) %>%
+  mutate(value = as.character(value)) %>% 
+  mutate(value = factor(value, levels = c("0", "0.25", "0.33", "0.5", "0.67", "0.75", "1")))
+
+# ANOVA results
+anova_pval_fun <- function(i){
+  indiv_NPI <- test_data %>% 
+    filter(NPI == i)
+  
+  aov_result <- aov(V_all_adj ~ value, data = indiv_NPI) %>% 
+    summary()
+  
+  pval_tab <- tibble(NPI = i, 
+                     period = PERIOD,
+                     pval = aov_result[[1]]$`Pr(>F)`[[1]]) %>% 
+    mutate(period = case_when(grepl("s0_full", period) ~ "Full_TS",
+                              grepl("s1_A", period) ~ "Alpha",
+                              grepl("s1_D", period) ~ "Delta"))
+  
+  return(pval_tab)
+}
+
+# map ANOVA results for each PHSM
+pval_res <- map_df(npi_val, anova_pval_fun)
+
+# Plot boxplot
+test_data %>% 
+  left_join(pval_res, by = c("NPI", "period")) %>% 
+  mutate(sig = if_else(pval > 0.05, "Not significant", "Significant")) %>% 
+  mutate(sig = factor(sig, levels = c("Significant", "Not significant"))) %>% 
+  ggplot(aes(x = value, y = V_all_adj, fill = cat, color = sig)) +
+  geom_boxplot(size = 0.75) +
+  scale_fill_manual(values = c('#66c2a5',
+                               '#fc8d62',
+                               '#8da0cb'))+
+  scale_color_manual(values = c("Significant" = "Black", "Not significant" = "grey60"))+
+  facet_wrap(~lab, nrow = 2, ncol = 7, labeller = label_wrap_gen(multi_line = T, width = 12))+
+  labs(y ="Vaccine uptake rate", 
+       x = "PHSM implementation strength",
+       fill = "",
+       color = "ANOVA significance", 
+       title = test_data %>% 
+         pull(period) %>% 
+         first())+
+  theme_bw()+
+  theme(panel.grid = element_blank(),
+        legend.position = "bottom",
+        legend.title = element_text(size = 12),
+        strip.background = element_rect(fill = NA),
+        axis.text.x = element_text(vjust = 0.5,
+                                   angle = 90,
+                                   hjust = 1),
+        axis.text = element_text(size = 8),
+        axis.title = element_text(size = 15),
+        legend.text = element_text(size = 8),
+        strip.text = element_text(size = 8))
+
+# Save
+ggsave(filename = paste0("figs/PHSM_x_VAC/ANOVA/",  test_data %>% 
+                           pull(period) %>% 
+                           first(), "_ANOVA_cont.png"),
+       plot = last_plot(),
+       width = 12,
+       height = 6)
+
+}
+# Map all VoC periods
+map(c("con_s0_full", "con_s1_A","con_s1_D"), ANOVA_plot)
+
+
+
+### Scatter plot alternative visualization
 effort_val <- c("con_s0_full", "con_s1_A","con_s1_D")
 
 # Function plot all countries together
